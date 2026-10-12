@@ -1,0 +1,15 @@
+[package]
+name = "pricka-bankid"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+hmac = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

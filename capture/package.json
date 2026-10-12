@@ -1,0 +1,13 @@
+{
+  "name": "pricka-capture",
+  "version": "1.0.0",
+  "description": "Network traffic capture tool for reverse-engineering bank APIs",
+  "type": "module",
+  "scripts": {
+    "capture": "node capture.mjs",
+    "analyze": "node analyze.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.58.2"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "scraped_at": "2026-01-01T12:00:00Z",
+  "accounts": [
+    {
+      "id": "0000000000",
+      "name": "Example checking",
+      "account_number": "0000000000",
+      "balance": "125.00",
+      "currency": "SEK"
+    }
+  ],
+  "transactions": {
+    "Example checking": [
+      {
+        "date": "2026-01-01",
+        "transaction_date": "2026-01-01",
+        "description": "Example purchase",
+        "amount": "-25.00",
+        "balance": "125.00"
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+# Build and local tooling
+target/
+node_modules/
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local configuration
+.env
+.env.*
+!.env.example
+**/.runtimeconfig.json
+
+# Banking exports and captures: never commit real session or account data
+captures/
+reference/screenshots/
+reference/transactions-sample.json
+transactions.json
+transactions-*.json
+*.har
+*.trace.zip
+
+# Python tooling
+__pycache__/
+*.pyc

@@ -1,0 +1,22 @@
+[package]
+name = "pricka-cli"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[[bin]]
+name = "pricka"
+path = "src/main.rs"
+
+[dependencies]
+pricka-core = { path = "../pricka-core" }
+pricka-bankid = { path = "../pricka-bankid" }
+pricka-handelsbanken = { path = "../pricka-handelsbanken" }
+pricka-seb = { path = "../pricka-seb" }
+clap = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+qrcode = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }

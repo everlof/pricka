@@ -1,0 +1,38 @@
+name: Bank support request
+description: Suggest an additional bank or login context without sharing account data.
+title: "Bank support: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not include identity numbers, account numbers, balances, transactions, cookies, tokens, BankID QR codes, or banking screenshots.
+  - type: input
+    id: bank
+    attributes:
+      label: Bank
+      description: The bank's public name.
+      placeholder: Example Bank
+    validations:
+      required: true
+  - type: dropdown
+    id: context
+    attributes:
+      label: Login context
+      options:
+        - Personal banking
+        - Business banking
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: What should the adapter cover?
+      description: Describe the login and export flows you need, without personal or financial details.
+    validations:
+      required: true
+  - type: textarea
+    id: help
+    attributes:
+      label: Can you help implement or test it?
+      description: Optional. State which flows you can verify with your own account; do not attach session data.
