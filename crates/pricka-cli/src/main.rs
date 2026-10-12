@@ -7,7 +7,7 @@ use pricka_core::{AuthPresenter, Bank, DateRange, ProxyConfig, ScrapeResult};
 #[derive(Parser)]
 #[command(name = "pricka", about = "Scrape Swedish bank transactions via BankID")]
 struct Cli {
-    /// Bank to connect to (handelsbanken-privat, seb-foretag)
+    /// Bank to connect to (handelsbanken-privat, handelsbanken-foretag, seb-foretag)
     #[arg(short, long)]
     bank: String,
 
@@ -126,9 +126,10 @@ fn parse_date(s: &str) -> Result<NaiveDate, String> {
 fn create_bank(name: &str, proxy: ProxyConfig, headless: bool) -> Result<Box<dyn Bank>, String> {
     match name {
         "handelsbanken-privat" => Ok(pricka_handelsbanken::create(proxy, headless)),
+        "handelsbanken-foretag" => Ok(pricka_handelsbanken::corporate::create(proxy, headless)),
         "seb-foretag" => Ok(pricka_seb::create(proxy, headless)),
         _ => Err(format!(
-            "Unknown bank: {name}. Available: handelsbanken-privat, seb-foretag"
+            "Unknown bank: {name}. Available: handelsbanken-privat, handelsbanken-foretag, seb-foretag"
         )),
     }
 }

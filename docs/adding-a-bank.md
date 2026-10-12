@@ -8,7 +8,7 @@ Name the CLI value `bank-context`, such as `example-privat`. Note which login, a
 
 ## 2. Create the crate
 
-Add `crates/pricka-<bank>-<context>/` and register it in the root `Cargo.toml` workspace. Use [Handelsbanken Privat](../crates/pricka-handelsbanken/src/lib.rs) or [SEB Företag](../crates/pricka-seb/src/lib.rs) as a guide. Implement [`Bank`](../crates/pricka-core/src/bank.rs):
+For a new bank, add `crates/pricka-<bank>/` and register it in the root `Cargo.toml` workspace. For a new login context at an existing bank, a separate module in its crate is fine. Compare [Handelsbanken Privat](../crates/pricka-handelsbanken/src/lib.rs), [Handelsbanken Företag](../crates/pricka-handelsbanken/src/corporate.rs), and [SEB Företag](../crates/pricka-seb/src/lib.rs) as guides. Implement [`Bank`](../crates/pricka-core/src/bank.rs):
 
 - `authenticate`: open the browser session, present BankID status through `AuthPresenter`, and retain only the session state needed for later calls.
 - `list_accounts`: map bank records to `Account`, including a stable account ID, display name, account number, balance when available, and currency.

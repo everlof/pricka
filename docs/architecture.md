@@ -3,7 +3,7 @@
 Pricka is a Rust workspace with a shared bank interface and a CLI. The CLI selects an adapter by `--bank`, authenticates through BankID, lists accounts, fetches transactions for a date range, and writes JSON to stdout or a file.
 
 - `pricka-core` defines `Bank`, `Account`, `Transaction`, `Balance`, and shared errors.
-- `pricka-handelsbanken` implements Handelsbanken personal banking.
+- `pricka-handelsbanken` implements separate Handelsbanken personal and company adapters.
 - `pricka-seb` implements SEB business banking.
 - `pricka-bankid` contains a QR helper for flows that require local QR generation; current adapters use bank-provided QR data.
 - `pricka-cli` handles options, QR display, adapter selection, and JSON output.

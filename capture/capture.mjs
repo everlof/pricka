@@ -4,6 +4,7 @@ import path from "path";
 
 const BANKS = {
   "handelsbanken-privat": "https://www.handelsbanken.se/sv/",
+  "handelsbanken-foretag": "https://secure.handelsbanken.se/logon/se/corp/sv/",
   "seb-foretag": "https://seb.se/foretag",
   "seb-privat": "https://seb.se/privat",
 };
