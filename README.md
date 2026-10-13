@@ -24,6 +24,19 @@ Handelsbanken Företag currently supports the default company account. Company s
 
 **The export contains personal and financial data.** Save it outside this repository. Do not attach real exports, banking screenshots, session captures, identity numbers, or credentials to issues or pull requests.
 
+## Application integration
+
+Use `--machine` to consume newline-delimited JSON events and provide private
+input over stdin. Applications such as bookkeeping tools can present BankID
+QR codes, select an account and import transactions without parsing terminal
+output. The protocol is part of Pricka and is independent of any consuming app.
+See [the machine protocol](docs/machine-protocol.md) for input, events and
+completion requirements.
+
+Both export modes reject malformed transaction data rather than silently
+dropping rows. SEB exports fail when a request returns a full 500-row page;
+use a smaller date range until pagination is implemented.
+
 ## Add a bank
 
 A bank adapter is a Rust crate implementing the [`Bank` trait](crates/pricka-core/src/bank.rs). The CLI currently selects adapters at compile time. Start with [Adding a bank](docs/adding-a-bank.md) for the exact files to change, a small implementation checklist, and privacy guidance. [CONTRIBUTING.md](CONTRIBUTING.md) explains how to propose and test a change.

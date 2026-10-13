@@ -12,7 +12,6 @@ const SERVLET_URL: &str = "https://secure.handelsbanken.se/bb/seip/servlet/ipko"
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TransactionResponse {
-    #[serde(default)]
     inla_account_transactions: Vec<RawTransaction>,
     #[allow(dead_code)]
     account_information: Option<AccountInfo>,
@@ -115,41 +114,111 @@ async fn fetch_chunk(
     ];
 
     let resp = browser_post(page, &url, &headers, &body).await?;
+    if resp.status != 200 {
+        return Err(PrickaError::Http(format!(
+            "Handelsbanken transactions returned {}",
+            resp.status
+        )));
+    }
 
     trace!(status = resp.status, "Transaction response");
 
     trace!(body_len = resp.body.len(), "Transaction response body");
 
     let tx_resp: TransactionResponse = serde_json::from_str(&resp.body)
-        .map_err(|e| PrickaError::Parse(format!("Failed to parse transactions: {e}")))?;
+        .map_err(|_| PrickaError::Parse("Unexpected transaction response".into()))?;
 
     info!(
         count = tx_resp.inla_account_transactions.len(),
         %from, %to, "Got chunk"
     );
 
-    let transactions: Vec<Transaction> = tx_resp
+    parse_transactions(tx_resp)
+}
+
+fn parse_transactions(response: TransactionResponse) -> Result<Vec<Transaction>> {
+    response
         .inla_account_transactions
         .into_iter()
-        .filter_map(|tx| {
-            let date = parse_date(&tx.transaction_date)?;
-            let amount = parse_amount(&tx.transaction_amount)?;
+        .map(|tx| {
+            let transaction_date = parse_date(&tx.transaction_date)
+                .ok_or_else(|| PrickaError::Parse("Invalid transaction date".into()))?;
+            let amount = parse_amount(&tx.transaction_amount)
+                .ok_or_else(|| PrickaError::Parse("Invalid transaction amount".into()))?;
 
             let ledger_date = if tx.ledger_date == "9999-12-31" {
                 None
             } else {
-                parse_date(&tx.ledger_date)
+                Some(
+                    parse_date(&tx.ledger_date)
+                        .ok_or_else(|| PrickaError::Parse("Invalid ledger date".into()))?,
+                )
             };
 
-            Some(Transaction {
-                date,
-                transaction_date: ledger_date,
+            Ok(Transaction {
+                date: ledger_date.unwrap_or(transaction_date),
+                transaction_date: Some(transaction_date),
                 description: tx.transaction_text,
                 amount,
                 balance: None,
             })
         })
-        .collect();
+        .collect()
+}
 
-    Ok(transactions)
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::{Value, json};
+
+    fn row() -> Value {
+        serde_json::from_str(r#"{"transactionText":"Synthetic","transactionDate":"2026-01-01","ledgerDate":"2026-01-02","transactionAmount":"-1 234,56"}"#).unwrap()
+    }
+
+    #[test]
+    fn synthetic_transactions_preserve_amounts_and_booking_dates() {
+        let response = serde_json::from_value(json!({"inlaAccountTransactions": [row()]})).unwrap();
+        let transactions = parse_transactions(response).unwrap();
+        assert_eq!(transactions.len(), 1);
+        assert_eq!(transactions[0].amount, Decimal::new(-123456, 2));
+        assert_eq!(
+            transactions[0].date,
+            NaiveDate::from_ymd_opt(2026, 1, 2).unwrap()
+        );
+        assert_eq!(
+            transactions[0].transaction_date,
+            NaiveDate::from_ymd_opt(2026, 1, 1)
+        );
+    }
+
+    #[test]
+    fn malformed_rows_fail_the_entire_response_instead_of_being_skipped() {
+        for field in ["transactionDate", "ledgerDate", "transactionAmount"] {
+            let mut malformed = row();
+            malformed[field] = json!("invalid");
+            let response =
+                serde_json::from_value(json!({"inlaAccountTransactions": [row(), malformed]}))
+                    .unwrap();
+            assert!(matches!(
+                parse_transactions(response),
+                Err(PrickaError::Parse(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn missing_list_fails_and_unbooked_date_uses_transaction_date() {
+        assert!(serde_json::from_value::<TransactionResponse>(json!({})).is_err());
+        let response = serde_json::from_value(json!({"inlaAccountTransactions": []})).unwrap();
+        assert!(parse_transactions(response).unwrap().is_empty());
+        let mut unbooked = row();
+        unbooked["ledgerDate"] = json!("9999-12-31");
+        let response =
+            serde_json::from_value(json!({"inlaAccountTransactions": [unbooked]})).unwrap();
+        let transactions = parse_transactions(response).unwrap();
+        assert_eq!(
+            transactions[0].date,
+            NaiveDate::from_ymd_opt(2026, 1, 1).unwrap()
+        );
+    }
 }

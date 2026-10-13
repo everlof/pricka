@@ -1073,6 +1073,7 @@ dependencies = [
 name = "pricka-cli"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "clap",
  "pricka-bankid",
@@ -1080,6 +1081,8 @@ dependencies = [
  "pricka-handelsbanken",
  "pricka-seb",
  "qrcode",
+ "rust_decimal",
+ "serde",
  "serde_json",
  "tokio",
  "tracing",

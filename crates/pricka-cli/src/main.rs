@@ -4,6 +4,8 @@ use chrono::NaiveDate;
 use clap::Parser;
 use pricka_core::{AuthPresenter, Bank, DateRange, ProxyConfig, ScrapeResult};
 
+mod machine;
+
 #[derive(Parser)]
 #[command(name = "pricka", about = "Scrape Swedish bank transactions via BankID")]
 struct Cli {
@@ -13,7 +15,11 @@ struct Cli {
 
     /// Swedish personal identity number (YYYYMMDDXXXX)
     #[arg(short, long)]
-    personnummer: String,
+    personnummer: Option<String>,
+
+    /// Emit JSON line events for applications; read private input from stdin
+    #[arg(long)]
+    machine: bool,
 
     /// SOCKS5 or HTTP proxy URL
     #[arg(long)]
@@ -135,8 +141,37 @@ fn create_bank(name: &str, proxy: ProxyConfig, headless: bool) -> Result<Box<dyn
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() {
     let cli = Cli::parse();
+    if let Err(error) = run(&cli).await {
+        if cli.machine {
+            let _ = machine::emit(&serde_json::json!({ "type": "error", "code": "sync_failed" }));
+        } else {
+            eprintln!("Error: {error}");
+        }
+        std::process::exit(1);
+    }
+}
+
+async fn run(cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
+    if cli.machine && cli.output.is_some() {
+        return Err("--output cannot be combined with --machine".into());
+    }
+    let machine_start: Option<machine::MachineStart> = cli
+        .machine
+        .then(|| machine::read_input(&mut std::io::stdin().lock()))
+        .transpose()?;
+    let personnummer = machine_start
+        .as_ref()
+        .and_then(|input| input.personnummer.as_deref())
+        .or(cli.personnummer.as_deref())
+        .unwrap_or("");
+    if cli.bank.starts_with("handelsbanken-")
+        && (personnummer.len() != 12 || !personnummer.bytes().all(|byte| byte.is_ascii_digit()))
+    {
+        return Err("Handelsbanken requires a 12-digit personnummer".into());
+    }
+    let range = date_range(cli)?;
 
     // Log levels: default=info, -v=debug, -vv=trace
     // RUST_LOG env var overrides if set
@@ -146,11 +181,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => "pricka=trace,pricka_handelsbanken=trace,pricka_bankid=trace",
     };
 
+    let filter = if cli.machine {
+        tracing_subscriber::EnvFilter::new("off")
+    } else {
+        tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| default_filter.parse().unwrap())
+    };
     tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| default_filter.parse().unwrap()),
-        )
+        .with_env_filter(filter)
         .with_target(true)
         .with_writer(std::io::stderr)
         .init();
@@ -170,31 +208,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create bank adapter
     let mut bank = create_bank(&cli.bank, proxy, !cli.headed)?;
-    eprintln!("Connecting to {}...", bank.name());
+    if !cli.machine {
+        eprintln!("Connecting to {}...", bank.name());
+    }
 
     // Authenticate
-    let presenter = TerminalPresenter;
-    bank.authenticate(&cli.personnummer, &presenter).await?;
+    let terminal_presenter = TerminalPresenter;
+    let machine_presenter = machine::MachinePresenter::default();
+    let presenter: &dyn AuthPresenter = if cli.machine {
+        &machine_presenter
+    } else {
+        &terminal_presenter
+    };
+    bank.authenticate(personnummer, presenter).await?;
+
+    if cli.machine {
+        if let Err(error) = machine_presenter.check() {
+            let _ = bank.logout().await;
+            return Err(error);
+        }
+        let selected_id = machine_start.and_then(|input| input.account_id);
+        machine::run_session(
+            &mut *bank,
+            &range,
+            selected_id,
+            &mut std::io::stdin().lock(),
+            &mut std::io::stdout().lock(),
+        )
+        .await?;
+        return Ok(());
+    }
 
     // Fetch accounts
     let accounts = bank.list_accounts().await?;
     eprintln!("Found {} accounts", accounts.len());
-
-    // Determine date range
-    let today = chrono::Local::now().date_naive();
-    let from = cli
-        .from
-        .as_deref()
-        .map(parse_date)
-        .transpose()?
-        .unwrap_or(today - chrono::Duration::days(90));
-    let to = cli
-        .to
-        .as_deref()
-        .map(parse_date)
-        .transpose()?
-        .unwrap_or(today);
-    let range = DateRange { from, to };
 
     // Fetch transactions for each account
     let mut transactions: HashMap<String, Vec<pricka_core::Transaction>> = HashMap::new();
@@ -225,4 +272,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     bank.logout().await?;
 
     Ok(())
+}
+
+fn date_range(cli: &Cli) -> Result<DateRange, Box<dyn std::error::Error>> {
+    let today = chrono::Local::now().date_naive();
+    let from = cli
+        .from
+        .as_deref()
+        .map(parse_date)
+        .transpose()?
+        .unwrap_or(today - chrono::Duration::days(90));
+    let to = cli
+        .to
+        .as_deref()
+        .map(parse_date)
+        .transpose()?
+        .unwrap_or(today);
+    if from > to {
+        return Err("--from must be on or before --to".into());
+    }
+    Ok(DateRange { from, to })
 }

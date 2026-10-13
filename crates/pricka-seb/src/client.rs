@@ -28,6 +28,12 @@ impl BrowserSession {
     /// Launch Chrome with optional proxy and headless mode.
     pub async fn launch(proxy: &ProxyConfig, headless: bool) -> Result<Self, PrickaError> {
         let mut builder = BrowserConfig::builder();
+        if let Some(path) = std::env::var_os("PRICKA_CHROME_BIN") {
+            builder = builder.chrome_executable(path);
+        }
+        if std::env::var("PRICKA_CHROME_NO_SANDBOX").as_deref() == Ok("1") {
+            builder = builder.no_sandbox();
+        }
         if !headless {
             builder = builder.with_head();
         }
